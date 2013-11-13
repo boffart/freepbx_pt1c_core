@@ -1,0 +1,17 @@
+***************
+*** 3714,3720 ****
+  			$ext->add($mcontext,$exten,'', new ext_set("RingGroupMethod", 'none'));
+  			$ext->add($mcontext,$exten,'', new ext_set("__EXTTOCALL", '${ARG2}'));
+  			$ext->add($mcontext,$exten,'', new ext_set("__PICKUPMARK", '${ARG2}'));
+- 			$ext->add($mcontext,$exten,'', new ext_set("RT", '${IF($["${ARG1}"!="novm" | "${DB(CFU/${EXTTOCALL})}"!="" | "${DB(CFB/${EXTTOCALL})}"!="" | ${LEN(${ARG3})} | ${LEN(${ARG4})} | ${LEN(${ARG5})}]?${RINGTIMER}:)}'));
+  			$ext->add($mcontext,$exten,'checkrecord', new ext_gosub('1','s','sub-record-check','exten,${EXTTOCALL},'));
+  
+        // If paging module is not present, then what happens?
+--- 3714,3720 ----
+  			$ext->add($mcontext,$exten,'', new ext_set("RingGroupMethod", 'none'));
+  			$ext->add($mcontext,$exten,'', new ext_set("__EXTTOCALL", '${ARG2}'));
+  			$ext->add($mcontext,$exten,'', new ext_set("__PICKUPMARK", '${ARG2}'));
++ 			$ext->add($mcontext,$exten,'', new ext_set("RT", '${IF($["${ARG1}"!="novm" | "${DB(CFU/${EXTTOCALL})}"!="" | "${DB(CFB/${EXTTOCALL})}"!="" | ${ARG3} | ${ARG4} | ${ARG5}]?${RINGTIMER}:)}'));
+  			$ext->add($mcontext,$exten,'checkrecord', new ext_gosub('1','s','sub-record-check','exten,${EXTTOCALL},'));
+  
+        // If paging module is not present, then what happens?
