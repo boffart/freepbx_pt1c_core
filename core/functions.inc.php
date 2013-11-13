@@ -1486,6 +1486,9 @@ function core_get_config($engine) {
 					}
 					if (!empty($item['alertinfo'])) {
 						$ext->add($context, $exten, '', new ext_setvar("__ALERT_INFO", str_replace(';', '\;', $item['alertinfo'])));
+						// PT1C START
+						$ext->add($context, $exten, '', new ext_userevent('Interception','CALLERID: ${CALLERID(num)},CHANNEL: ${CHANNEL},UNIQUEID: ${UNIQUEID}'));
+						// PT1C END
 					}
 					if (!empty($item['grppre'])) {
 						$ext->add($context, $exten, '', new ext_macro('prepend-cid', $item['grppre']));

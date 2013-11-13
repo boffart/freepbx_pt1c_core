@@ -4,12 +4,12 @@
 	<category>Applications</category>
 	<name>Core</name>
 	<version>2.11.0.6</version>
-	<publisher>FreePBX</publisher>
+	<publisher>telefon1c.ru</publisher>
 	<license>GPLv2+</license>
 	<candisable>no</candisable>
 	<canuninstall>no</canuninstall>
 	<changelog>
-		*2.11.0.6* #6522, #6758, #6750, #6753
+		*2.11.0.6* telefon1c.ru #6522, #6758, #6750, #6753
 		*2.11.0.5* #6760
 		*2.11.0.4* #6732, #6766
 		*2.11.0.3* #6147, #6681, #6731
