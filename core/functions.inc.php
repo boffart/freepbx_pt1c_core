@@ -1,22 +1,8 @@
 <?php
+// vim: :set filetype=php tabstop=4 shiftwidth=4 autoindent smartindent:
 if (!defined('FREEPBX_IS_AUTH')) { die('No direct script access allowed'); }
-//This file is part of FreePBX.
-//
-//    FreePBX is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    FreePBX is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with FreePBX.  If not, see <http://www.gnu.org/licenses/>.
-//
-//    Copyright (C) 2004 Coalescent Systems Inc. (info@coalescentsystems.ca)
-//    Copyright (C) 2013 Philippe Lindheimer
+//	License for all code of this FreePBX module can be found in the license file inside the module directory
+//	Copyright 2006-2014 Schmooze Com Inc.
 //
 
 class core_conf {
@@ -85,7 +71,8 @@ class core_conf {
 			'sip_notify_additional.conf',
 			'res_odbc_additional.conf',
 			'chan_dahdi_additional.conf',
-			'rtp_additional.conf'
+			'rtp_additional.conf',
+			'http_additional.conf'
 		);
 		return $files;
 	}
@@ -132,15 +119,18 @@ class core_conf {
 			case 'features_featuremap_additional.conf':
 				return $this->generate_featuremap_additional($version);
 				break;
-			case 'res_odbc_additional.conf': 
-				return $this->generate_res_odbc_additional($version); 
+			case 'res_odbc_additional.conf':
+				return $this->generate_res_odbc_additional($version);
 				break;
 			case 'rtp_additional.conf':
 				return $this->generate_rtp_additional($version);
 				break;
+			case 'http_additional.conf':
+				return $this->generate_http_additional($version);
+				break;
 		}
 	}
-	
+
 	// If sipsettings isn't there this will try to set the rtp.conf value
 	//
 	function setDefaultRtp() {
@@ -184,6 +174,18 @@ class core_conf {
 		return $output;
 	}
 
+	function generate_http_additional($ast_version) {
+		$freepbx_conf =& freepbx_conf::create();
+
+		$output = "[general]\n";
+		$output .= "enabled=".($freepbx_conf->get_conf_setting('HTTPENABLED') ? 'yes' : 'no')."\n";
+		$output .= "enablestatic=".($freepbx_conf->get_conf_setting('HTTPENABLESTATIC') ? 'yes' : 'no')."\n";
+		$output .= "bindaddr=".$freepbx_conf->get_conf_setting('HTTPBINDADDRESS')."\n";
+		$output .= "bindport=".$freepbx_conf->get_conf_setting('HTTPBINDPORT')."\n";
+		$output .= "prefix=".$freepbx_conf->get_conf_setting('HTTPPREFIX')."\n";
+		return $output;
+	}
+
   function addSipNotify($section,$entries) {
     $this->_sip_notify[] = array('section' => $section, 'entries' => $entries);
   }
@@ -224,10 +226,10 @@ class core_conf {
     }
     return $output;
   }
-  
-    function addSipAdditional($section, $key, $value) { 
-      $this->_sip_additional[$section][] = array('key' => $key, 'value' => $value); 
-    } 
+
+    function addSipAdditional($section, $key, $value) {
+      $this->_sip_additional[$section][] = array('key' => $key, 'value' => $value);
+    }
 
 	function addSipGeneral($key, $value) {
 		$this->_sip_general[] = array('key' => $key, 'value' => $value);
@@ -788,6 +790,8 @@ function core_destinations() {
 	global $amp_conf;
 	//static destinations
 	$extens = array();
+	$td = textdomain();
+	textdomain("amp");
 	$category = _("Terminate Call");
 	$ds_id = 'blackhole';
 	$extens[] = array('destination' => 'app-blackhole,hangup,1', 'description' => _("Hangup"), 'category' => $category, 'id' => $ds_id);
@@ -796,6 +800,7 @@ function core_destinations() {
 	$extens[] = array('destination' => 'app-blackhole,zapateller,1', 'description' => _("Play SIT Tone (Zapateller)"), 'category' => $category, 'id' => $ds_id);
 	$extens[] = array('destination' => 'app-blackhole,musiconhold,1', 'description' => _("Put caller on hold forever"), 'category' => $category, 'id' => $ds_id);
 	$extens[] = array('destination' => 'app-blackhole,ring,1', 'description' => _("Play ringtones to caller until they hangup"), 'category' => $category, 'id' => $ds_id);
+	textdomain($td);
 
 	//get the list of meetmes
 	$results = core_users_list();
@@ -975,10 +980,24 @@ function core_get_config($engine) {
 	global $amp_conf;
 	global $core_conf;
 	global $chan_dahdi;
-  	global $chan_dahdi_loaded;
+	global $chan_dahdi_loaded;
 	global $astman;
 
 	$modulename = "core";
+
+	$callrecording = 'callrecording';
+	$callrecording_uid = 'MISSING_CALLRECORDINGS';
+	$getCallRecordingModInfo = module_getinfo($callrecording, MODULE_STATUS_ENABLED);
+	$nt =& notifications::create($db);
+	if (!isset($getCallRecordingModInfo[$callrecording]) || ($getCallRecordingModInfo[$callrecording]['status'] !== MODULE_STATUS_ENABLED)) {
+		if(!$nt->exists($modulename, $callrecording_uid)) {
+			$nt->add_notice($modulename, $callrecording_uid, _('Call Recording Module Not Enabled'), _('The Call Recording module is not enabled. Since this feature is required for call recording you may not be able to record calls until the module is installed and enabled.'), '', true, true);
+		}
+	} else {
+		if($nt->exists($modulename, $callrecording_uid)) {
+			$nt->delete($modulename, $callrecording_uid);
+		}
+	}
 
 	switch($engine) {
 		case "asterisk":
@@ -1026,16 +1045,12 @@ function core_get_config($engine) {
 				$fcc = new featurecode($modulename, 'blindxfer');
 				$code = $fcc->getCodeActive();
 				unset($fcc);
-				if ($code != '') {
-					$core_conf->addFeatureMap('blindxfer',$code);
-				}
+				$core_conf->addFeatureMap('blindxfer',$code);
 
 				$fcc = new featurecode($modulename, 'atxfer');
 				$code = $fcc->getCodeActive();
 				unset($fcc);
-				if ($code != '') {
-					$core_conf->addFeatureMap('atxfer',$code);
-				}
+				$core_conf->addFeatureMap('atxfer',$code);
 
 				$fcc = new featurecode($modulename, 'automon');
 				$code = $fcc->getCodeActive();
@@ -1063,16 +1078,12 @@ function core_get_config($engine) {
 				$fcc = new featurecode($modulename, 'disconnect');
 				$code = $fcc->getCodeActive();
 				unset($fcc);
-				if ($code != '') {
-					$core_conf->addFeatureMap('disconnect',$code);
-				}
+				$core_conf->addFeatureMap('disconnect',$code);
 
 				$fcc = new featurecode($modulename, 'pickupexten');
 				$code = $fcc->getCodeActive();
 				unset($fcc);
-				if ($code != '') {
-					$core_conf->addFeatureGeneral('pickupexten',$code);
-				}
+				$core_conf->addFeatureGeneral('pickupexten',$code);
 			}
 
 			// FeatureCodes
@@ -1446,10 +1457,13 @@ function core_get_config($engine) {
 						$ext->add($context, $exten, '', new ext_vqa($amp_conf['DITECH_VQA_INBOUND']));
           }
 
-					if (!empty($item['mohclass']) && trim($item['mohclass']) != 'default') {
-						$ext->add($context, $exten, '', new ext_setmusiconhold($item['mohclass']));
-						$ext->add($context, $exten, '', new ext_setvar('__MOHCLASS',$item['mohclass']));
+					// Always set __MOHCLASS and moh.
+					if (empty($item['mohclass'])) {
+						// Should never happen
+						$item['mohclass'] = "default";
 					}
+					$ext->add($context, $exten, '', new ext_setmusiconhold($item['mohclass']));
+					$ext->add($context, $exten, '', new ext_setvar('__MOHCLASS',$item['mohclass']));
 
 					// If we require RINGING, signal it as soon as we enter.
 					if ($item['ringing'] === "CHECKED") {
@@ -1487,7 +1501,7 @@ function core_get_config($engine) {
 					if (!empty($item['alertinfo'])) {
 						$ext->add($context, $exten, '', new ext_setvar("__ALERT_INFO", str_replace(';', '\;', $item['alertinfo'])));
 						// PT1C START
-						$ext->add($context, $exten, '', new ext_userevent('Interception','CALLERID: ${CALLERID(num)},CHANNEL: ${CHANNEL},UNIQUEID: ${UNIQUEID}'));
+						$ext->add($context, $exten, '', new ext_userevent('Interception','CALLERID: ${CALLERID(num)},CHANNEL: ${CHANNEL}'));
 						// PT1C END
 					}
 					if (!empty($item['grppre'])) {
@@ -1622,15 +1636,12 @@ function core_get_config($engine) {
 					if (!$amp_conf['DYNAMICHINTS']) {
 						$hint = core_hint_get($exten['extension']);
 						$dnd_string = ($amp_conf['USEDEVSTATE'] && function_exists('donotdisturb_get_config')) ? "&Custom:DND".$exten['extension'] : '';
-						if (!empty($hint)) {
-							$ext->addHint('ext-local', $exten['extension'], $hint.$dnd_string);
+						$presence_string = $amp_conf['AST_FUNC_PRESENCE_STATE'] ? ",CustomPresence:".$exten['extension'] : '';
+						$hint_string = (!empty($hint) ? $hint : '') . $dnd_string . $presence_string;
+						if ($hint_string) {
+							$ext->addHint('ext-local', $exten['extension'], $hint_string);
 							if ($intercom_code != '') {
-								$ext->addHint('ext-local', $intercom_code.$exten['extension'], $hint.$dnd_string);
-							}
-						} else if ($dnd_string) {
-							$ext->addHint('ext-local', $exten['extension'], "&Custom:DND".$exten['extension']);
-							if ($intercom_code != '') {
-								$ext->addHint('ext-local', $intercom_code.$exten['extension'], "&Custom:DND".$exten['extension']);
+								$ext->addHint('ext-local', $intercom_code.$exten['extension'], $hint_string);
 							}
 						}
 					}
@@ -2250,7 +2261,7 @@ function core_get_config($engine) {
           if ($fpattern['base_pattern'] != $exten) {
             $ext->add($context, $exten, '', new ext_macro('user-callerid,LIMIT,EXTERNAL'));
           }
-          $ext->add($context, $exten, '', new ext_noop_trace(sprintf(_('Calling Out Route: %s'),$route['name']),1));
+          $ext->add($context, $exten, '', new ext_noop_trace(sprintf(_('Calling Out Route: %s'),'${SET(OUTBOUND_ROUTE_NAME='.$route['name'].')}'),1));
 					if ($route['dest']) {
 						$ext->add($context, $exten, '', new ext_set("ROUTE_CIDSAVE",'${CALLERID(all)}'));
 					}
@@ -2362,6 +2373,38 @@ function core_get_config($engine) {
 				$ext->add($context, $exten, '', new ext_wait('1'));
 				$ext->add($context, $exten, '', new ext_congestion('20'));
 				$ext->add($context, $exten, '', new ext_hangup());
+			}
+
+			if ($amp_conf['AST_FUNC_PRESENCE_STATE']) {
+				$states = array(
+					'available' => 'Available',
+					'chat' => 'Chatty',
+					'away' => 'Away',
+					'dnd' => 'DND',
+					'xa' => 'Extended Away',
+					'unavailable' => 'Unavailable'
+				);
+
+				$context = 'sub-presencestate-display';
+
+				$exten = 's';
+				$ext->add($context, $exten, '', new ext_goto(1, 'state-${TOLOWER(${PRESENCE_STATE(CustomPresence:${ARG1},value)})}'));
+
+				foreach ($states as $state => $display) {
+					$exten = 'state-' . $state;
+					$ext->add($context, $exten, '', new ext_setvar('PRESENCESTATE_DISPLAY', '(' . $display . ')'));
+					$ext->add($context, $exten, '', new ext_return(''));
+				}
+
+				// Don't display anything if presencestate is unknown (Coding bug)
+				$exten = '_state-.';
+				$ext->add($context, $exten, '', new ext_setvar('PRESENCESTATE_DISPLAY', ''));
+				$ext->add($context, $exten, '', new ext_return(''));
+
+				// Don't display anything if presencestate is empty (not set).
+				$exten = 'state-';
+				$ext->add($context, $exten, '', new ext_setvar('PRESENCESTATE_DISPLAY', ''));
+				$ext->add($context, $exten, '', new ext_return(''));
 			}
 
 			/*
@@ -2882,12 +2925,16 @@ function core_get_config($engine) {
 
 			$ext->add($context, $exten, '', new ext_set('TOUCH_MONITOR','${UNIQUEID}'));
 			// make sure AMPUSER is set if it doesn't get set below
-			$ext->add($context, $exten, '', new ext_set('AMPUSER', '${IF($["foo${AMPUSER}" = "foo"]?${CALLERID(number)}:${AMPUSER})}'));
+			$ext->add($context, $exten, '', new ext_set('AMPUSER', '${IF($["${AMPUSER}" = ""]?${CALLERID(number)}:${AMPUSER})}'));
 			$ext->add($context, $exten, '', new ext_gotoif('$["${CUT(CHANNEL,@,2):5:5}"="queue" | ${LEN(${AMPUSERCIDNAME})}]', 'report'));
 			$ext->add($context, $exten, '', new ext_execif('$["${REALCALLERIDNUM:1:2}" = ""]', 'Set', 'REALCALLERIDNUM=${CALLERID(number)}'));
 			$ext->add($context, $exten, '', new ext_set('AMPUSER', '${DB(DEVICE/${REALCALLERIDNUM}/user)}'));
+
+			// Device & User: If they're not signed in, then they can't do anything.
+			$ext->add($context, $exten, '', new ext_gotoif('$["${AMPUSER}" = "none"]', 'limit'));
+
 			$ext->add($context, $exten, '', new ext_set('AMPUSERCIDNAME', '${DB(AMPUSER/${AMPUSER}/cidname)}'));
-			$ext->add($context, $exten, '', new ext_gotoif('$["x${AMPUSERCIDNAME:1:2}" = "x"]', 'report'));
+			$ext->add($context, $exten, '', new ext_gotoif('$["${AMPUSERCIDNAME:1:2}" = ""]', 'report'));
 
 			// user may masquerade as a different user internally, so set the internal cid as indicated
 			// but keep the REALCALLERID which is used to determine their true identify and lookup info
@@ -4150,7 +4197,12 @@ function core_get_config($engine) {
         //
         if ($amp_conf['AST_FUNC_CONNECTEDLINE']) {
           $ext->add($mcontext,$exten,'', new ext_gotoif('$["${DB(AMPUSER/${EXTTOCALL}/cidname)}" = "" || "${DB(AMPUSER/${AMPUSER}/cidname)}" = ""]','godial'));
-          $ext->add($mcontext,$exten,'', new ext_set('CONNECTEDLINE(name,i)', '${DB(AMPUSER/${EXTTOCALL}/cidname)}'));
+          $cidnameval = '${DB(AMPUSER/${EXTTOCALL}/cidname)}';
+          if ($amp_conf['AST_FUNC_PRESENCE_STATE'] && $amp_conf['CONNECTEDLINE_PRESENCESTATE']) {
+            $ext->add($mcontext,$exten,'', new ext_gosub('1','s','sub-presencestate-display','${EXTTOCALL}'));
+            $cidnameval.= '${PRESENCESTATE_DISPLAY}';
+          }
+          $ext->add($mcontext,$exten,'', new ext_set('CONNECTEDLINE(name,i)', $cidnameval));
           $ext->add($mcontext,$exten,'', new ext_set('CONNECTEDLINE(num)', '${EXTTOCALL}'));
           $ext->add($mcontext,$exten,'', new ext_set('D_OPTIONS', '${D_OPTIONS}I'));
         }
@@ -4450,8 +4502,8 @@ function core_did_add($incoming,$target=false){
 	if (empty($existing)) {
 		//Strip <> just to be on the safe side otherwise this is not deleteable from the GUI
          	$invalidDIDChars = array('<','>');
-         	$extension = str_replace($invalidDIDChars,"",$extension);
-         	$cidnum = str_replace($invalidDIDChars,"",$cidnum);
+         	$extension = trim(str_replace($invalidDIDChars,"",$extension));
+         	$cidnum = trim(str_replace($invalidDIDChars,"",$cidnum));
 
 		$destination= ($target) ? $target : ${$goto0.'0'};
 		$sql="INSERT INTO incoming (cidnum,extension,destination,privacyman,pmmaxretries,pmminlength,alertinfo, ringing, mohclass, description, grppre, delay_answer, pricid) values ('$cidnum','$extension','$destination','$privacyman','$pmmaxretries','$pmminlength','$alertinfo', '$ringing', '$mohclass', '$description', '$grppre', '$delay_answer', '$pricid')";
@@ -4863,7 +4915,7 @@ function core_devices_addsip($account) {
 	foreach ($_REQUEST as $req=>$data) {
 		if ( substr($req, 0, 8) == 'devinfo_' ) {
 			$keyword = substr($req, 8);
-      $data = $db->escapeSimple(trim($data));
+			$data = trim($data);
 			if ( $keyword == 'dial' && $data == '' ) {
 				$sipfields[] = array($account, $keyword, 'SIP/'.$account, $flag++);
 			} elseif ($keyword == 'mailbox' && $data == '') {
@@ -4877,48 +4929,48 @@ function core_devices_addsip($account) {
 	}
 
 	if ( !is_array($sipfields) ) { // left for compatibilty....lord knows why !
-		$sipfields[] = array($account,'accountcode',$db->escapeSimple((isset($_REQUEST['accountcode']))?$_REQUEST['accountcode']:''),$flag++);
-	    $sipfields[] =array($account,'secret',$db->escapeSimple((isset($_REQUEST['secret']))?$_REQUEST['secret']:''),$flag++);
-	    $sipfields[] = array($account,'canreinvite',$db->escapeSimple((isset($_REQUEST['canreinvite']))?$_REQUEST['canreinvite']:$amp_conf['DEVICE_SIP_CANREINVITE']),$flag++);
-	    $sipfields[] = array($account,'trustrpid',$db->escapeSimple((isset($_REQUEST['trustrpid']))?$_REQUEST['trustrpid']:$amp_conf['DEVICE_SIP_TRUSTRPID']),$flag++);
-	    $sipfields[] = array($account,'sendrpid',$db->escapeSimple((isset($_REQUEST['sendrpid']))?$_REQUEST['sendrpid']:$amp_conf['DEVICE_SIP_SENDRPID']),$flag++);
-	    $sipfields[] = array($account,'context',$db->escapeSimple((isset($_REQUEST['context']))?$_REQUEST['context']:'from-internal'),$flag++);
-	    $sipfields[] = array($account,'dtmfmode',$db->escapeSimple((isset($_REQUEST['dtmfmode']))?$_REQUEST['dtmfmode']:''),$flag++);
-	    $sipfields[] = array($account,'host',$db->escapeSimple((isset($_REQUEST['host']))?$_REQUEST['host']:'dynamic'),$flag++);
-	    $sipfields[] = array($account,'type',$db->escapeSimple((isset($_REQUEST['type']))?$_REQUEST['type']:'friend'),$flag++);
-	    $sipfields[] = array($account,'mailbox',$db->escapeSimple((isset($_REQUEST['mailbox']) && !empty($_REQUEST['mailbox']))?$_REQUEST['mailbox']:$account.'@device'),$flag++);
-	    $sipfields[] = array($account,'username',$db->escapeSimple((isset($_REQUEST['username']))?$_REQUEST['username']:$account),$flag++);
-	    $sipfields[] = array($account,'nat',$db->escapeSimple((isset($_REQUEST['nat']))?$_REQUEST['nat']:$amp_conf['DEVICE_SIP_NAT']),$flag++);
-	    $sipfields[] = array($account,'port',$db->escapeSimple((isset($_REQUEST['port']))?$_REQUEST['port']:'5060'),$flag++);
-	    $sipfields[] = array($account,'qualify',$db->escapeSimple((isset($_REQUEST['qualify']))?$_REQUEST['qualify']:$amp_conf['DEVICE_QUALIFY']),$flag++);
+		$sipfields[] = array($account,'accountcode',(isset($_REQUEST['accountcode'])?$_REQUEST['accountcode']:''),$flag++);
+	    $sipfields[] = array($account,'secret',(isset($_REQUEST['secret'])?$_REQUEST['secret']:''),$flag++);
+	    $sipfields[] = array($account,'canreinvite',(isset($_REQUEST['canreinvite'])?$_REQUEST['canreinvite']:$amp_conf['DEVICE_SIP_CANREINVITE']),$flag++);
+	    $sipfields[] = array($account,'trustrpid',(isset($_REQUEST['trustrpid'])?$_REQUEST['trustrpid']:$amp_conf['DEVICE_SIP_TRUSTRPID']),$flag++);
+	    $sipfields[] = array($account,'sendrpid',(isset($_REQUEST['sendrpid'])?$_REQUEST['sendrpid']:$amp_conf['DEVICE_SIP_SENDRPID']),$flag++);
+	    $sipfields[] = array($account,'context',(isset($_REQUEST['context'])?$_REQUEST['context']:'from-internal'),$flag++);
+	    $sipfields[] = array($account,'dtmfmode',(isset($_REQUEST['dtmfmode'])?$_REQUEST['dtmfmode']:''),$flag++);
+	    $sipfields[] = array($account,'host',(isset($_REQUEST['host'])?$_REQUEST['host']:'dynamic'),$flag++);
+	    $sipfields[] = array($account,'type',(isset($_REQUEST['type'])?$_REQUEST['type']:'friend'),$flag++);
+	    $sipfields[] = array($account,'mailbox',(isset($_REQUEST['mailbox']) && !empty($_REQUEST['mailbox'])?$_REQUEST['mailbox']:$account.'@device'),$flag++);
+	    $sipfields[] = array($account,'username',(isset($_REQUEST['username'])?$_REQUEST['username']:$account),$flag++);
+	    $sipfields[] = array($account,'nat',(isset($_REQUEST['nat'])?$_REQUEST['nat']:$amp_conf['DEVICE_SIP_NAT']),$flag++);
+	    $sipfields[] = array($account,'port',(isset($_REQUEST['port'])?$_REQUEST['port']:'5060'),$flag++);
+	    $sipfields[] = array($account,'qualify',(isset($_REQUEST['qualify'])?$_REQUEST['qualify']:$amp_conf['DEVICE_QUALIFY']),$flag++);
 	    if (version_compare($amp_conf['ASTVERSION'],'1.6','ge')) {
-	      $sipfields[] = array($account,'qualifyfreq',$db->escapeSimple((isset($_REQUEST['qualifyfreq']))?$_REQUEST['qualifyfreq']:$amp_conf['DEVICE_SIP_QUALIFYFREQ']),$flag++);
+	      $sipfields[] = array($account,'qualifyfreq',(isset($_REQUEST['qualifyfreq'])?$_REQUEST['qualifyfreq']:$amp_conf['DEVICE_SIP_QUALIFYFREQ']),$flag++);
 	    }
 	    if (version_compare($amp_conf['ASTVERSION'],'1.8','ge')) {
-	      $sipfields[] = array($account,'transport',$db->escapeSimple((isset($_REQUEST['transport']))?$_REQUEST['transport']:'udp'),$flag++);
-	      $sipfields[] = array($account,'encryption',$db->escapeSimple((isset($_REQUEST['encryption']))?$_REQUEST['encryption']:$amp_conf['DEVICE_SIP_ENCRYPTION']),$flag++);
+	      $sipfields[] = array($account,'transport',(isset($_REQUEST['transport'])?$_REQUEST['transport']:'udp'),$flag++);
+	      $sipfields[] = array($account,'encryption',(isset($_REQUEST['encryption'])?$_REQUEST['encryption']:$amp_conf['DEVICE_SIP_ENCRYPTION']),$flag++);
 	    }
-	    $sipfields[] = array($account,'callgroup',$db->escapeSimple((isset($_REQUEST['callgroup']))?$_REQUEST['callgroup']:$amp_conf['DEVICE_CALLGROUP']),$flag++);
-	    $sipfields[] = array($account,'pickupgroup',$db->escapeSimple((isset($_REQUEST['pickupgroup']))?$_REQUEST['pickupgroup']:$amp_conf['DEVICE_PICKUPGROUP']),$flag++);
-	    $sipfields[] = array($account,'deny',$db->escapeSimple((isset($_REQUEST['deny']))?$_REQUEST['deny']:''),$flag++);
-	    $sipfields[] = array($account,'permit',$db->escapeSimple((isset($_REQUEST['permit']))?$_REQUEST['permit']:''),$flag++);
-	    $sipfields[] = array($account,'disallow',$db->escapeSimple((isset($_REQUEST['disallow']))?$_REQUEST['disallow']:$amp_conf['DEVICE_DISALLOW']),$flag++);
-	    $sipfields[] = array($account,'allow',$db->escapeSimple((isset($_REQUEST['allow']))?$_REQUEST['allow']:$amp_conf['DEVICE_ALLOW']),$flag++);
+	    $sipfields[] = array($account,'callgroup',(isset($_REQUEST['callgroup'])?$_REQUEST['callgroup']:$amp_conf['DEVICE_CALLGROUP']),$flag++);
+	    $sipfields[] = array($account,'pickupgroup',(isset($_REQUEST['pickupgroup'])?$_REQUEST['pickupgroup']:$amp_conf['DEVICE_PICKUPGROUP']),$flag++);
+	    $sipfields[] = array($account,'deny',(isset($_REQUEST['deny'])?$_REQUEST['deny']:''),$flag++);
+	    $sipfields[] = array($account,'permit',(isset($_REQUEST['permit'])?$_REQUEST['permit']:''),$flag++);
+	    $sipfields[] = array($account,'disallow',(isset($_REQUEST['disallow'])?$_REQUEST['disallow']:$amp_conf['DEVICE_DISALLOW']),$flag++);
+	    $sipfields[] = array($account,'allow',(isset($_REQUEST['allow'])?$_REQUEST['allow']:$amp_conf['DEVICE_ALLOW']),$flag++);
 
 		if (version_compare($amp_conf['ASTVERSION'],'11','ge')) {
-			$sipfields[] = array($account,'avpf',$db->escapeSimple((isset($_REQUEST['avpf']))?$_REQUEST['avpf']:'no'),$flag++);
-			$sipfields[] = array($account,'icesupport',$db->escapeSimple((isset($_REQUEST['icesupport']))?$_REQUEST['icesupport']:'no'),$flag++);
+			$sipfields[] = array($account,'avpf',(isset($_REQUEST['avpf'])?$_REQUEST['avpf']:'no'),$flag++);
+			$sipfields[] = array($account,'icesupport',(isset($_REQUEST['icesupport'])?$_REQUEST['icesupport']:'no'),$flag++);
 		}
-	
-	    $vmexten = isset($_REQUEST['vmexten'])?$db->escapeSimple(trim($_REQUEST['vmexten'])):'';
+
+	    $vmexten = isset($_REQUEST['vmexten'])?trim($_REQUEST['vmexten']):'';
 	    if ($vmexten != '') {
 	      $sipfields[] = array($account,'vmexten',$vmexten,$flag++);
 	    }
 	}
 
 	// Very bad
-	$sipfields[] = array($account,'account',$db->escapeSimple($account),$flag++);
-	$sipfields[] = array($account,'callerid',$db->escapeSimple((isset($_REQUEST['description']) && $_REQUEST['description'])?$_REQUEST['description']." <".$account.'>':'device'." <".$account.'>'),$flag++);
+	$sipfields[] = array($account,'account',$account,$flag++);
+	$sipfields[] = array($account,'callerid',(isset($_REQUEST['description']) && $_REQUEST['description'])?$_REQUEST['description']." <".$account.'>':'device'." <".$account.'>',$flag++);
 
 	$compiled = $db->prepare('INSERT INTO sip (id, keyword, data, flags) values (?,?,?,?)');
 	$result = $db->executeMultiple($compiled,$sipfields);
@@ -6184,6 +6236,8 @@ function core_trunks_list($assoc = false) {
 }
 
 function core_trunks_addRegister($trunknum,$tech,$reg,$disable_flag=0) {
+	global $db;
+	$reg = $db->escapeSimple(trim($reg));
 	sql("INSERT INTO $tech (id, keyword, data, flags) values ('tr-reg-$trunknum','register','$reg','$disable_flag')");
 }
 
@@ -6201,7 +6255,7 @@ function core_trunks_update_dialrules($trunknum, &$patterns, $delete = false) {
   foreach ($patterns as $pattern) {
     $match_pattern_prefix = $db->escapeSimple(preg_replace($filter_prefix,'',strtoupper(trim($pattern['match_pattern_prefix']))));
     $match_pattern_pass = $db->escapeSimple(preg_replace($filter_match,'',strtoupper(trim($pattern['match_pattern_pass']))));
-    $prepend_digits = $db->escapeSimple(preg_replace($filter_prepend,'',strtoupper(trim($pattern['prepend_digits']))));
+    $prepend_digits = $db->escapeSimple(str_replace('W', 'w', preg_replace($filter_prepend,'',strtoupper(trim($pattern['prepend_digits'])))));
     if ($match_pattern_prefix.$match_pattern_pass == '') {
       continue;
     }
@@ -6277,14 +6331,14 @@ function core_trunks_getTrunkTrunkName($trunknum) {
 
 function core_trunks_getTrunkPeerDetails($trunknum) {
 	global $db;
-	
+
 	$tech = core_trunks_getTrunkTech($trunknum);
-	
+
 	if (!core_trunk_has_registrations($tech)) {
 		return '';
-	}	
+	}
 	$results = sql("SELECT keyword,data FROM $tech WHERE `id` = 'tr-peer-$trunknum' ORDER BY flags, keyword DESC","getAll");
-	
+
 	foreach ($results as $result) {
 		if ($result[0] != 'account') {
 			if (isset($confdetail))
@@ -6303,12 +6357,12 @@ function core_trunks_getTrunkUserContext($trunknum) {
 
 function core_trunks_getTrunkUserConfig($trunknum) {
 	global $db;
-	
+
 	$tech = core_trunks_getTrunkTech($trunknum);
 	if (!core_trunk_has_registrations($tech)) {
 		return '';
 	}
-	
+
 	$results = sql("SELECT keyword,data FROM $tech WHERE `id` = 'tr-user-$trunknum' ORDER BY flags, keyword DESC","getAll");
 
 	foreach ($results as $result) {
@@ -6327,8 +6381,8 @@ function core_trunks_getTrunkRegister($trunknum) {
 	$tech = core_trunks_getTrunkTech($trunknum);
 	if (!core_trunk_has_registrations($tech)){
 		return '';
-	}	
-	
+	}
+
 	$results = sql("SELECT `keyword`, `data` FROM $tech WHERE `id` = 'tr-reg-$trunknum'","getAll");
 
 	foreach ($results as $result) {
@@ -6631,9 +6685,11 @@ function core_routing_addbyid($name, $outcid, $outcid_mode, $password, $emergenc
     VALUES ('$name', '$outcid', '$outcid_mode', '$password', '$emergency_route', '$intracompany_route', '$mohclass', $time_group_id, '$dest')";
   sql($sql);
 
-  // TODO: sqlite_last_insert_rowid() un-tested and php5 ???
-  //
-  $route_id = $amp_conf["AMPDBENGINE"] == "sqlite3" ? sqlite_last_insert_rowid($db->connection) : mysql_insert_id($db->connection);
+  if(method_exists($db,'insert_id')) {
+	  $route_id = $db->insert_id();
+  } else {
+	  $route_id = $amp_conf["AMPDBENGINE"] == "sqlite3" ? sqlite_last_insert_rowid($db->connection) : mysql_insert_id($db->connection);
+  }
 
   core_routing_updatepatterns($route_id, $patterns);
   core_routing_updatetrunks($route_id, $trunks);
@@ -7100,7 +7156,7 @@ function core_users_configpageload() {
 		$disable_dialopts = $dialopts === false;
 		$currentcomponent->addguielem($section, new gui_textbox_check('dialopts', $dialopts, _("Asterisk Dial Options"), _("Cryptic Asterisk Dial Options, check to customize for this extension or un-check to use system defaults set in Advanced Options. These will not apply to trunk options which are configured with the trunk."), '', '', true, 0, $disable_dialopts, '<small>' . _("Override") . '</small>', $amp_conf['DIAL_OPTIONS'], true));
 
-		$currentcomponent->addguielem($section, new gui_selectbox('ringtimer', $currentcomponent->getoptlist('ringtime'), $ringtimer, _("Ring Time"), _("Number of seconds to ring prior to going to voicemail. Default will use the value set in the General Tab. If no voicemail is configured this will be ignored."), false));
+		$currentcomponent->addguielem($section, new gui_selectbox('ringtimer', $currentcomponent->getoptlist('ringtime'), $ringtimer, _("Ring Time"), _("Number of seconds to ring prior to going to voicemail. Default will use the value set in Advanced Settings. If no voicemail is configured this will be ignored."), false));
 
     if (!isset($cfringtimer)) {
       if ($amp_conf['CFRINGTIMERDEFAULT'] < 0 || ctype_digit($amp_conf['CFRINGTIMERDEFAULT'])) {
@@ -7138,7 +7194,7 @@ function core_users_configpageload() {
 		$did_count = 0;
 		foreach ($dids as $did) {
 			$did_dest = preg_split('/,/',$did['destination']);
-			if (isset($did_dest[1]) && $did_dest[1] == $extdisplay) {
+			if (isset($did_dest[1]) && $did_dest[1] === $extdisplay) {
 
 				$did_title = ($did['description'] != '') ? $did['description'] : _("DID / CID");
 
@@ -7614,7 +7670,7 @@ function core_devices_configpageinit($dispnum) {
 		$users = core_users_list();
 		if (isset($users)) {
 			foreach ($users as $auser) {
-				$currentcomponent->addoptlistitem('deviceuserlist', $auser[0], $auser[0]);
+				$currentcomponent->addoptlistitem('deviceuserlist', $auser[0], $auser[0] . " (" . $auser[1] . ")");
 			}
 		}
 		$currentcomponent->setoptlistopts('deviceuserlist', 'sort', false);
@@ -7745,7 +7801,7 @@ function core_devices_configpageload() {
           // We compare the existing secret against what might be in the put to detect changes when validating
           if ($devopt == "secret") {
             $currentcomponent->addguielem($section, new gui_hidden($devopname . "_origional", $devoptcurrent), 4);
-						if ($devoptcurrent == '') {
+						if ($devoptcurrent == '' && empty($extdisplay)) {
 							$devoptcurrent = md5(uniqid());
 						}
           }

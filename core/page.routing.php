@@ -1,22 +1,7 @@
-<?php /* $Id: page.routing.php 15021 2013-01-27 12:01:15Z tm1000 $ */
-// This file is part of FreePBX.
-//
-//    FreePBX is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    FreePBX is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with FreePBX.  If not, see <http://www.gnu.org/licenses/>.
-//
-//    Copyright (C) 2004 Greg MacLellan (greg@mtechsolutions.ca)
+<?php /* $Id$ */
+//	License for all code of this FreePBX module can be found in the license file inside the module directory
+//	Copyright 2006-2014 Schmooze Com Inc.
 //    Copyright (C) 2005 Ron Hartmann (rhartmann@vercomsystems.com)
-//    Copyright (C) 2004 Coalescent Systems Inc. (info@coalescentsystems.ca)
 //
 if (!defined('FREEPBX_IS_AUTH')) { die('No direct script access allowed'); }
 $display='routing'; 
@@ -631,7 +616,7 @@ END;
             insert = '<?php echo _("NXXXXXX,NXXNXXXXXX") ?>';
 					break;
 					case 'tollfree':
-            insert = '<?php echo _("1800NXXXXXX,1888NXXXXXX,1877NXXXXXX,1866NXXXXXX,1855NXXXXXX") ?>';
+            insert = '<?php echo _("1800NXXXXXX,1888NXXXXXX,1877NXXXXXX,1866NXXXXXX,1855NXXXXXX,1844NXXXXXX") ?>';
 					break;
 					case "ld":
             insert = '<?php echo _("1NXXNXXXXXX") ?>';

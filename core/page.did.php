@@ -1,21 +1,5 @@
-<?php /* $Id: page.did.php 13488 2012-02-20 23:06:39Z p_lindheimer $ */
-// This file is part of FreePBX.
-//
-//    FreePBX is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    FreePBX is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with FreePBX.  If not, see <http://www.gnu.org/licenses/>.
-//
-//   Copyright (C) 2004 Coalescent Systems Inc. (info@coalescentsystems.ca)
-//
+<?php /* $Id$ */
+
 if (!defined('FREEPBX_IS_AUTH')) { die('No direct script access allowed'); }
 $action = isset($_REQUEST['action'])?$_REQUEST['action']:'';
 $extdisplay= htmlspecialchars(isset($_REQUEST['extdisplay'])?$_REQUEST['extdisplay']:'');
@@ -210,7 +194,7 @@ if (isset($inroutes)) {
 		</tr>
 		<tr>
 			<td><a href="#" class="info"><?php echo _("DID Number")?><span><?php echo _('Define the expected DID Number if your trunk passes DID on incoming calls. <br><br>Leave this blank to match calls with any or no DID info.<br><br>You can also use a pattern match (eg _2[345]X) to match a range of numbers')?></span></a>:</td>
-			<td><input type="text" name="extension" value="<?php echo isset($extension)?$extension:''; ?>" tabindex="<?php echo ++$tabindex;?>"></td>
+			<td><input type="text" name="extension" class="noextmap" value="<?php echo isset($extension)?$extension:''; ?>" tabindex="<?php echo ++$tabindex;?>"></td>
 		</tr>
 		<tr>
 			<td><a href="#" class="info"><?php echo _("CallerID Number")?><span><?php echo _('Define the CallerID Number to be matched on incoming calls.<br><br>Leave this field blank to match any or no CID info. In addition to standard dial sequences, you can also put Private, Blocked, Unknown, Restricted, Anonymous and Unavailable in order to catch these special cases if the Telco transmits them.')?></span></a>:</td>
@@ -349,7 +333,7 @@ function editGRP_onsubmit() {
 	}
 
 	var mycid = theForm.cidnum.value.toLowerCase();
-	if (!isDialpattern(mycid) && mycid.substring(0,4) != "priv" && mycid.substring(0,5) != "block" && mycid != "unknown" && mycid.substring(0,8) != "restrict" && mycid.substring(0,7) != "unavail" && mycid.substring(0,6) != "anonym" && mycid.substring(0,7) != "witheld")
+	if (!isDialpattern(mycid) && mycid.substring(0,4) != "priv" && mycid.substring(0,5) != "block" && mycid != "unknown" && mycid.substring(0,8) != "restrict" && mycid.substring(0,7) != "unavail" && mycid.substring(0,6) != "anonym" && mycid.substring(0,7) != "withheld")
 		return warnInvalid(theForm.cidnum, msgInvalidCIDNum);
 	
 	if (!isInteger(theForm.delay_answer.value))
